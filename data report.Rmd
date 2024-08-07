@@ -1,0 +1,168 @@
+---
+title: "Early Departure Text Message Data Issues"
+author: "Office of Performance Management"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+source(here::here("R", "libraries.R"))
+```
+
+## Purpose
+
+This memorandum outlines the discrepancies between the MTA's adherence data and the data that captures messages sent to drivers operating ahead of their schedule.
+
+## Queries
+The hidden section shows the SQL code used for my queries. 
+
+<details>
+  <summary>Click to reveal code</summary>
+```{sql, eval = F, echo = T}
+-- Messages
+SELECT 
+  CAST(CH.MESSAGE_TIME AS date) AS MessageDate
+  , CAST(CH.MESSAGE_TIME AS time) AS MessageTime
+	, O.ONBOARD_LOGON_ID AS OperatorId
+FROM 
+    [TMDataMart].[dbo].[COMM_HISTORY] CH
+    LEFT JOIN [TMDataMart].[dbo].[COMM_VEHICLE_SNAPSHOT] CVS 
+        ON CONVERT(VARCHAR, CH.MESSAGE_TIME, 120) = CONVERT(VARCHAR, CVS.SNAPSHOT_TIME, 120)
+    INNER JOIN [TMDataMart].[dbo].[OPERATOR] O 
+        ON O.OPERATOR_ID = CVS.DRIVER_ID
+WHERE 
+    CH.DISPATCHER_ID = 222
+    AND CH.MESSAGE_TIME BETWEEN '2024-01-01' AND '2024-04-30'
+    AND CH.MESSAGE_DATA LIKE '%ahead of schedule%';
+    
+-- Adherence    
+SELECT
+  trip_id AS TripId
+  , scheduled_date AS ScheduledDate
+  , scheduled_time AS ScheduledTime
+  , vehicle_id AS VehicleId
+  , driver_payrollNumber AS OperatorId
+  ,	lsStopSequence AS StopSequence
+  , stop_id AS StopId
+  , actual_time AS DepartureTime
+  , sched_adherence_secs AS AdherenceSecs	
+  , stop_name AS StopName
+  , early_flag AS Early
+FROM
+[OPM_Datawarehouse].[dbo].[SwiftlyJoinedWithTrapeze]
+WHERE 
+  scheduled_date BETWEEN '2024-01-01' AND '2024-04-30'
+  AND driver_payrollNumber IN (", operators ,") -- 'operators' is a string passed into the query from R
+  
+```
+</details> 
+
+### Duplicate Records
+
+- There are two duplicate rows in the messages data: OperatorIds (7274 , 90568) received two messages at the same time (2024-04-17 15:04:46, 2024-04-22 10:42:33). 
+
+### Unmatched Messages
+
+```{r,}
+read_parquet(here::here("data", "NoMatchMessages.parquet")) %>%
+    downloadthis::download_this(
+    output_name = "NoMatchMessages",
+    output_extension = ".csv",
+    button_label = "Download data as csv",
+    button_type = "default",
+    has_icon = TRUE,
+    icon = "fa fa-save"
+  )
+
+```
+
+- I was unable to match 313 of 749 messages to bus stops. I checked a few non-matching messages against adherence records:
+  - OperatorId == 55558 AND ScheduledDate == '2024-01-22' received a message at 2024-01-22 09:27:07, but their prior stop was at 09:03:00 and their next stop was 11:47:09.
+  - OperatorId == 61846 and SceduledDate == 03-11 received a message at 2024-03-11 11:38:49, but their prior stop was at 2024-03-11 09:58:24 and their next stop was 2024-03-11 14:09:02.
+  - OperatorId == 8966 received a message at 2024-04-09 13:39:43, but that OperatorId has no records in adherence for that day. That same OperatatorId also received a message at 2024-04-23, but has no records on that day either.
+
+### Contributors
+
+This analysis was conducted and Rob Ross (OPM). Work is stored on [GitHub](https://github.com/MTA-MD-OPM/ds_early_bus_departure_intervention_study/tree/main).
+
+## Queries
+The hidden section shows the SQL code used for my queries. 
+
+<details>
+  <summary>Click for Answer</summary>
+```{sql, eval = F, echo = T}
+-- Messages
+SELECT 
+  CAST(CH.MESSAGE_TIME AS date) AS MessageDate
+  , CAST(CH.MESSAGE_TIME AS time) AS MessageTime
+	, O.ONBOARD_LOGON_ID AS OperatorId
+FROM 
+    [TMDataMart].[dbo].[COMM_HISTORY] CH
+    LEFT JOIN [TMDataMart].[dbo].[COMM_VEHICLE_SNAPSHOT] CVS 
+        ON CONVERT(VARCHAR, CH.MESSAGE_TIME, 120) = CONVERT(VARCHAR, CVS.SNAPSHOT_TIME, 120)
+    INNER JOIN [TMDataMart].[dbo].[OPERATOR] O 
+        ON O.OPERATOR_ID = CVS.DRIVER_ID
+WHERE 
+    CH.DISPATCHER_ID = 222
+    AND CH.MESSAGE_TIME BETWEEN '2024-01-01' AND '2024-04-30'
+    AND CH.MESSAGE_DATA LIKE '%ahead of schedule%';
+    
+-- Adherence    
+SELECT
+  trip_id AS TripId
+  , scheduled_date AS ScheduledDate
+  , scheduled_time AS ScheduledTime
+  , vehicle_id AS VehicleId
+  , driver_payrollNumber AS OperatorId
+  ,	lsStopSequence AS StopSequence
+  , stop_id AS StopId
+  , actual_time AS DepartureTime
+  , sched_adherence_secs AS AdherenceSecs	
+  , stop_name AS StopName
+  , early_flag AS Early
+FROM
+[OPM_Datawarehouse].[dbo].[SwiftlyJoinedWithTrapeze]
+WHERE 
+  scheduled_date BETWEEN '2024-01-01' AND '2024-04-30'
+  AND driver_payrollNumber IN (", operators ,") -- 'operators' is a string passed into the query from R
+  
+```
+</details> 
+
+### Duplicate Records
+
+There are two duplicates in the messages data:
+
+```{r, }
+read_parquet(here::here("data", "dup_messages.parquet")) %>%
+  knitr::kable()
+```
+
+### Non-matching records
+
+I was unable to match 313 of 749 messages to bus stops. My matching process was: first, match messages to drivers on specific days. Then I matched messages to specific stops on a specific trip by checking whether the difference between the message time and the departure time on one stop was positive (message arrived after), but it was negative for the next stop in the data (message arrived before).
+
+Here are a few examples I manually checked:
+
+  - OperatorId == 55558 AND ScheduledDate == '2024-01-22' received a message at 2024-01-22 09:27:07, but their prior stop was at 09:03:00 and their next stop was 11:47:09.
+  - OperatorId == 61846 and SceduledDate == 03-11 received a message at 2024-03-11 11:38:49, but their prior stop was at 2024-03-11 09:58:24 and their next stop was 2024-03-11 14:09:02.
+  - OperatorId == 8966 received a message at 2024-04-09 13:39:43, but that OperatorId has no records in adherence for that day. That same OperatatorId also received a message at 2024-04-23, but has no records on that day either.
+
+Here are all of the nonmatching messages. 
+
+``` {r,}
+read_parquet(here::here("data", "NoMatchMessages.parquet")) %>%
+  download_this(
+    output_name = "NoMatchMessages",
+    output_extension = ".csv",
+    button_label = "Download data",
+    button_type = "primary",
+    has_icon = TRUE,
+    icon = "fa fa-save"
+  )
+```
+
+### Contributors
+
+Robert Ross, OPM

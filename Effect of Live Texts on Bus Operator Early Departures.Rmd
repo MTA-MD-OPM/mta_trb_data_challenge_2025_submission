@@ -1,0 +1,279 @@
+---
+title: "Do Live Texts Reduce Early Bus Departures?"
+author: "Office of Performance Management"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: 
+      toc_collapse: TRUE
+    theme: united
+engine: knitr
+knitr:
+  opts_chunk: 
+    R.options:
+      width: 120
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, out.width = "100%")
+source("R/libraries.R")
+text_data <- read_parquet("data/text_data.parquet")
+source("R/text graph functions.R")
+source("R/text regression analysis.R")
+source("R/text graph data.R")
+
+```
+
+## Study Objective
+
+The purpose of this analysis is to examine whether contacting bus operators who are running ahead of their schedule is an effective way of reducing early bus departures. 
+
+The MTA is working hard to improve on-time departure rates for bus service. Busses may leave a stop late for many reasons, but early departures are mostly at the discretion of the bus operator. Early departures are undesirable; busses that depart early may leave before boarding passengers who time their arrival based on published schedules. This may lead to frustration on the part of these passengers, and passengers may arrive at their destination late because the next scheduled bus is several minutes later than the bus they intended to take. 
+
+In order to prevent early departures, the MTA enacted an intervention in real-time. Operators receive a text message on their on-board Mobile Data Terminal when their bus is ahead of schedule. The hypothesis is that bus drivers who receive this text will be reminded to delay their bus and re-align with their scheduled route, while drivers who do not receive the text will run increasingly ahead of schedule. The null is that texting has no impact on drivers' schedule adherence, either because drivers do not respond to the text message and continue to run early, or because all drivers naturally adjust their schedule adherence during their work pieces. Both hypotheses have supporting anecdotal evidence.
+
+## Results Summary 
+
+- Messages to drivers' on-board Mobil Data Terminal are an effective way to encourage on-time departures.
+  - On average, **drivers who receive a text message immediately increase adherence by `r inline_data[1]` seconds,** bringing them closer to their schedule. However, this adjustment does not return them to their schedule immediately. 
+  - Drivers depart their first time-point stop after receiving the text an average of 91 seconds early. 
+  - On average, drivers who receive a text message adjust 8 seconds closer to on-time with each subsequent stop after receiving their text message.
+  - After receiving a text, drivers depart all remaining time-point stops 36 seconds early on average.
+  - On average, **drivers who received a text message reduced their early departure rate by `r inline_data[2]`%** after receiving the text.
+  - Drivers depart their first time-point stop after receiving the text an average early 42% of the time.
+  - On average, drivers who received a text message reduced their early departure rate by 2% with each subsequent stop.
+  - After receiving a text, drivers depart 32% of remaining time-point stops early.
+- I find no evidence that operators who ran ahead of their schedules and did not receive a text message self-corrected. While this comparison group is not a *true* "control group" in the sense of a randomized evaluation, it is nonetheless strong evidence that text messages cause a positive change in drivers' behavior.
+- Note that the preceding statements are not generalizable, even with the use of a comparison group. You can say that text messages reduced early departures by 18% on average. It does *not* follow that expanding the texting process to be universally applicable will reduce early departures by 18% system wide. This is so because the text treatment was not randomly applied to your sample population. The effect measured by this paper is only the Average Treatment on Treated effect, not the Average Treatment Effect.
+- It is unclear whether the messaging is functioning as intended, or whether the messages are correctly reported in the data. I was unable to match 323 of 749 messages to bus stops. In a few cases, drivers supposedly received messages on days they were not operating a bus. In addition, some drivers seem to have received messages while operating on schedule. 
+
+```{r graph1, include=T, out.width = "100%", out.height= "600p"}
+source("R/text graph functions.R")
+g3.1 <- g3.1(gd3.1)
+g3.2 <- g3.2(gd3.2)
+
+plot <- ggarrange(g3.1, g3.2, ncol=2) 
+annotate_figure(plot, top = text_grob("Graph 1 - Main results", 
+               color = "black", face = "bold", size = 14))
+
+```
+
+## Recommendation
+
+Tens of thousands of work pieces ran ahead of schedule and did not receive a text message. Here is a large opportunity to expand the number of text messages sent. If it is cost-prohibitive to send a large number of text messages, we recommend identifying the subset of trips where early departures have the most negative impact on our riders, and prioritizing those to receive texts. The smallest incremental policy change is simply to send more texts to the right operators at the right times. MTA should repeat this analysis at some convenient time in the future to see whether the qualitative outcomes change.
+
+## Methodology
+In order to complete this analysis, I used the Adherence data in the OPM Data Warehouse to identify work pieces. A work piece is a single, continuous sequence of stops within a TripId and OperatorId on a given day. For example, if an operator works a given Trip on Monday, and then again on Tuesday, they have completed two separate work pieces. If an operator runs one trip and then another in one day, that is their work, with one Trip being a work piece. 
+
+I classified work pieces based on a) whether the operator ran ahead of their schedule on that work piece and b) whether the operator received a text during their work piece. For work pieces in the second group, I associated the text message with a specific stop on the work piece Texts are matched to stops where they received the text message prior to departing that stop, but after departing the previous stop in the same run. As I discuss below, it is not necessarily the case that all operators who received texts were running ahead of their schedule when they received the text. 
+
+I classified work pieces in the first group that did not receive a text (a but not b) as "Comparison" work pieces. A work piece was classified as a comparison work piece if it had 40 or more stops, the average early departure rate was greater than 40%, and the average adherence seconds was less than -40. These comparison work pieces allow us to see whether operators self-correct early runs without the aid of a text message. It may have been the case that the text message arrives at about the same time that bus operators would self-correct anyway. Without a comparison group, we may have erroneously attributed the effect of operators' own self-corrections to the arrival of the text message.
+
+The table below reports basic counts of text, operators, and runs by group.
+
+```{r table1}
+read_parquet(here::here( "data", "summary_stats.parquet")) %>%
+knitr::kable(
+               caption = "Table 1 - Summary statistics of study"
+             , align = "lc"
+             ) %>%
+  kable_styling(full_width = F)
+
+```
+
+### Time Point Stops
+
+This analysis incorporates time point stops. In estimating the average effect of texts on drivers' behavior, I use all stops because this relates directly to rider experience. Riders are unaware of which stops are time point stops and which are not, and so the overall efficacy of the text intervention should be calculated at the stop level rather than the time-point stop level. 
+
+In estimating individual drivers' reactions to the text messages, I use only time-point stops. I did this because the analysis of individual drivers' behavior may be used later in employment actions. It is important, then, to condition the analysis on time-point stops. 
+
+### Aggregating across individual operators' data
+
+In order to answer the question, we must average across individual operators and runs. To understand how I did this, consider a single work piece by an operator who received a text. In the panel below, Graph 2.1 shows that operator's adherence time for each stop plotted against the time the bus departed from the stop. Graph 2.2 shows the same data, but the X-axis has been adjusted to be the stop sequence relative to the stop at which the operator received the text message. Organizing the data in this second way allows us to aggregate and analyze all messages and operators by "relative stop," the stop sequence relative to the stop at which the operator received their message. 
+
+```{r graph2, include=T, out.width = "100%", out.height= "600p"}
+source("R/text graph functions.R")
+g1.1 <- g1.1(gd1)
+g1.2 <- g1.2(gd1)
+
+plot <- ggarrange(g1.1, g1.2, ncol=2, common.legend = TRUE, legend="bottom") 
+
+annotate_figure(plot, top = text_grob("Graph 2 - One 'treatment group' driver's data", 
+               color = "black", face = "bold", size = 14))
+
+```
+
+#### Comparison Group
+
+The comparison group ran ahead of their schedules but did not receive a text. In order to be able to compare the comparison and treatment groups, I sequenced stops relative to the median stop in each run. Graph 3 below shows one operator's run before and after the stop re-sequencing.
+
+```{r graph3, include=T, out.width = "100%", out.height= "500p"}
+source("R/text graph functions.R")
+g1.1 <- g1.1(gd2)
+g1.2 <- g1.2(gd2)
+
+plot <- ggarrange(g1.1, g1.2, ncol=2, common.legend = TRUE, legend="bottom") 
+
+annotate_figure(plot, top = text_grob("Graph 3 - One 'control group' driver's data", 
+               color = "black", face = "bold", size = 14))
+
+```
+
+## Detailed Results
+
+We can visualize the average effect of texts by aggregating outcomes for each work piece over relative stop order. Graph 3.1 below shows the range of adherence times leading up to, and after receiving a text message. Graph 3.2 shows the average on-time rate over the same window. We can see that operators that start to run early who receive a text message respond strongly right away, and also adjust their arrival times with each subsequent stop, progressively coming closer to their scheduled departure times. We can also see no evidence that operators who do not receive a text self-correct. 
+
+
+```{r graph4, include=T, out.width = "100%"}
+source("R/text graph functions.R")
+g4.1 <- g4.1(gd4)
+g4.2 <- g4.2(gd4)
+
+plot <- ggarrange(g4.1, g4.2, ncol=2, common.legend = TRUE, legend="bottom") 
+
+annotate_figure(plot, top = text_grob("Graph 4 - Average text effect", 
+               color = "black", face = "bold", size = 14))
+```
+
+### Average Text Effect
+
+Since our comparison group is not a true control group, I chose to use a Regression Discontinuity Design (RDD) without a second-order difference to estimate the impact of texts on drivers' behavior. A difference-in-difference analysis in this case would likely over-state the impact of the text messages, as the comparison group is not a true control.
+
+$$ y_s = \beta_0 + \beta_1(S_s) + \beta_2(T_s) + \beta_3(T_s)(S_s) + \mu_s $$
+
+Outcomes for stop s - adherence seconds and early departures - ($y_s$) are a function of stop sequence (S) and treatment period (T). The coefficient ($\beta_3$) on the interaction term will show the level effect of the text on each outcome.  Again, remember that this data includes **all stops, not just time-point stops**. The table below reports the results of the regression. Model (1) shows that adherence seconds increased on average by `r inline_data[1]` seconds after the text message was received, and then 8 seconds with each subsequent stop. Model (2) shows that early departure rates decreased on average by `r inline_data[2]`% after the text was received, and then -2% with each subsequent stop. Both regressions show an immediate and lasting impact of text messages, on average. 
+
+```{r model1, include=T,  results = "asis", align = "center"}
+stargazer(model1.1, model1.2
+          , title = "Table 2 - Regression Results"
+          , type = 'html'
+          , covariate.labels=c(
+            "Average Change per stop"
+            , "Average post-treatment outcome"
+            , "Average per stop change in the outcome post-treatment"
+            , "Average Outcome")
+          , dep.var.labels=c("Adherence Seconds")
+          , ci=TRUE, ci.level=0.90, single.row=TRUE
+          , column.sep.width = "25pt"
+          , omit.stat = c("rsq","ser", "f", "adj.rsq"))
+
+```
+
+### Empirically estimating individual text efects
+
+I also estimated each individual operators' text effect. Again, this regression **only uses time-point stops**. My form is:
+
+
+$$y_s = \beta_0 + \beta_1(S_s) + \gamma(T_s)(R_s) + \delta(T_s)(S_s)(W_s) + \mu_s$$
+
+Outcomes at each stop - adherence seconds and early departures - ($y_s$) are a function of stop sequence (S),  treatment period (T), and WorkPiecId (W). The elements of ($\hat{\gamma}$) indicate the degree to which text messages immediately impact a driver's behavior, and the elements of ($\hat{\delta}$) show the improvement over time after receiving the text for each driver. The elements of ($\hat{\gamma}$) are graphed below with 95% confidence intervals.
+
+Graph 5.1 plots the elements of ($\hat{\gamma}$) and shows that most operators - those with point estimates above 0 - seem to have increased their average adherence seconds in response to receiving a text. Confidence intervals on these point estimates are tight, and most Operators' estimates are statistically different from zero.
+
+Graph 5.2 shows that most operators managed to reduce their average early departure rate after receiving the text. Though fewer point estimates here are statistically different from zero, most of them are below zero.
+
+```{r graph5}
+g1.1 <- g.reg.1.1(coeffs2.1, label = "5.1 - Change in mean adherence seconds")
+g1.2 <- g.reg.1.1(coeffs2.2, label = "5.2 - Change in early departure rate")
+
+plot <- ggarrange(g1.1, g1.2, ncol=1, nrow = 2) 
+annotate_figure(plot, top = text_grob("Graph 5 - Individual text effects by run", 
+               color = "black", face = "bold", size = 14))
+
+```
+
+### Idiosyncratic treatment effects
+
+In Graph 5.1, runs with a positive estimated effects can be classified as 'Compliers' in that they complied with the text's instruction to slow down. By the same logic, runs with a negative or zero estimated effect can be classified as 'Noncomplier.' Table 3 below shows the count of work pieces by classification. Table 4 shows the count of Operators by work piece classification. Note that the unit of observation is a work piece, not an operator. An operator that received multiple text during different work pieces may be counted as both a complier and a noncomplier, depending on their response to each text.
+
+``` {r takers}
+coeffs2.1 %>%
+  dplyr::distinct(WorkPieceId, `Outcome Group` ) %>%
+  dplyr::group_by(`Outcome Group`) %>%
+  dplyr::summarise(
+    `Work Pieces` = n()
+  ) %>%
+  knitr::kable(
+               caption = "Table 3 - Run count by effect sign"
+             , align = "lc"
+             ) %>%
+  kable_styling(full_width = F)
+
+coeffs2.1 %>%
+  dplyr::select(WorkPieceId,  `Outcome Group`) %>%
+  dplyr::mutate(WorkPieceId = factor(WorkPieceId)) %>%
+  inner_join(text_data) %>%
+  dplyr::distinct(OperatorIdHash, `Outcome Group` ) %>%
+  dplyr::group_by(`Outcome Group`) %>%
+  dplyr::summarise(
+    Operators = n()
+  ) %>%
+  knitr::kable(
+               caption = "Table 4 - Operator count by effect sign"
+             , align = "lc"
+             ) %>%
+  kable_styling(full_width = F)
+```
+
+#### Non-complier examples
+
+Graph 6 below shows two examples of 'noncompliers' - operators who seem to not react to the text message they receive. 
+
+``` {r noncompliers, out.width = "100%", out.height= "500p"}
+g1 <- subset(text_data,
+        WorkPieceId == coeffs2.1$WorkPieceId[1]) %>%
+  g1.1reg()
+g3 <- subset(text_data,
+        WorkPieceId == coeffs2.1$WorkPieceId[5]) %>%
+  g1.1reg()
+
+plot <- ggarrange(g1, g3, ncol=2, nrow = 1, common.legend = TRUE, legend="bottom") 
+annotate_figure(plot, top = text_grob("Graph 6 - Non compliers runs", 
+               color = "black", face = "bold", size = 14))
+
+```
+
+#### Complier examples
+
+Graph 7 shows two examples of operators who reacted to the text message. 
+
+
+``` {r compliers, out.hight = "1500pt"}
+g1 <- subset(text_data,
+        WorkPieceId == coeffs2.1$WorkPieceId[249]) %>%
+  g1.1reg()
+g3 <- subset(text_data,
+        WorkPieceId == coeffs2.1$WorkPieceId[201]) %>%
+  g1.1reg()
+
+plot <- ggarrange(g1, g3, ncol=2, nrow = 1, common.legend = TRUE, legend="bottom") 
+annotate_figure(plot, top = text_grob("Graph 7 - Complier runs", 
+               color = "black", face = "bold", size = 14))
+```
+
+
+## Reliability of message data
+There are a number of issues with the message data that frustrated this analysis. We found four main issues with the message data:
+
+- The adherence table had no records for the Date and OperatorId associated with certain messages.
+- There are duplicated rows in the adherence table - different rows have the same TripId, OperatorId, and DepartureDateTime. However, the stop names are different. This causes a failure to match a text to a specific stop, since the matchin requires stops to be sequential in time.
+- Messages arrived between two runs or after the last departure time of a run.
+- Messages arrived before the first departure time of a run.
+
+#### Duplicated rows
+There are two duplicate rows in the messages data: OperatorIds (7274 , 90568) received two messages at the same time (2024-04-17 15:04:46, 2024-04-22 10:42:33). 
+
+#### Messages that don't match to adherence
+- I was unable to match 323 of 749 messages to bus stops. I checked a few non-matching messages against adherence records:
+  - OperatorId == 55558 AND ScheduledDate == '2024-01-22' received a message at 2024-01-22 09:27:07, but their prior stop was at 09:03:00 and their next stop was 11:47:09.
+  - OperatorId == 61846 and SceduledDate == 03-11 received a message at 2024-03-11 11:38:49, but their prior stop was at 2024-03-11 09:58:24 and their next stop was 2024-03-11 14:09:02.
+  - OperatorId == 8966 received a message at 2024-04-09 13:39:43, but that OperatorId has no records in adherence for that day. That same OperatatorId also received a message at 2024-04-23, but has no records on that day either.
+
+#### Messages to drivers who aren't running early
+
+Visually inspecting individual runs, I found some where the operator received a text despite running on schedule. 
+
+## Attribution
+
+This analysis was conducted by Anqi Li (OPM), Ana Daley (OPM), and Rob Ross . Work is stored on [GitHub](https://github.com/MTA-MD-OPM/ds_early_bus_departure_intervention_study/tree/main).
