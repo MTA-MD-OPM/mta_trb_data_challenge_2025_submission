@@ -1,0 +1,154 @@
+---
+title: "Do Disciplinary Actions Reduce Early Bus Departures?"
+author: "Office of Performance Management"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: 
+      toc_collapse: TRUE
+    theme: united
+engine: knitr
+knitr:
+  opts_chunk: 
+    R.options:
+      width: 120
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+source("R/libraries.R")
+discipline_data <- read_parquet("data/discipline_data.parquet")
+source("R/discipline analysis.R")
+
+```
+## Study Objective
+
+The purpose of this analysis is to examine whether disciplining bus operators who are running ahead of their schedule is an effective way of reducing early bus departures. 
+
+The MTA is working hard to improve on-time departure rates for bus service. Busses may leave a stop late for many reasons, but early departures are mostly at the discretion of the bus operator. Early departures are undesirable; busses that depart early may leave before boarding passengers who time their arrival based on published schedules. This may lead to frustration on the part of these passengers, and passengers may arrive at their destination late because the next scheduled bus is several minutes later than the bus they intended to take. 
+
+In order to prevent early departures, the MTA pursues employment actions against bus operators who consistently depart stops early. These actions typically consist of written reprimands, but may be escalated to termination on a case-by-case basis.
+
+## Results Summary 
+
+- Employment actions are an effective way to encourage on-time departures. 
+- On average, employment actions reduce an operators' mean daily early departure rate by 9.7%.
+- On average, employment actions increase an operators' mean daily adherence seconds by 54 seconds.
+- On average, after receiving discipline, bus operators take about 50 days before their daily early departure rate exceeds 15%, and about 300 days before it exceeds 20%. 
+
+Graph 1 below shows these results. In these graphs, the yellow line plots average outcomes by day, with day == 0 marking when operators were disciplined for running early.  The red lines show the predicted outcomes by day, with the gap between the left and right segments showing the treatment effect. The larger the gap, the stronger the effect.
+
+``` {r graph1, out.width = "100%"}
+g1.1 <- g1.1(gd1)
+g1.2 <- g1.2(gd1)
+
+plot <- ggarrange(g1.1, g1.2, nrow = 1)
+annotate_figure(plot, top = text_grob("Graph 1 - Main results", 
+               color = "black", face = "bold", size = 14))
+
+
+```
+
+## Methodology 
+
+The analysis data is created simply by joining daily data containing two outcomes of interest - average early departure rates and adherence seconds by driver and day - to discipline data that contains all disciplines where the description contains the key work 'ahead.' I only included time-point stops in the first data set, and all disciplines for running ahead of schedule in the second. For each operator, we identify the day they receive a discipline. We then calculate dates relative to the day they received a discipline. 
+
+### Counts
+Table 1 below reports the raw counts of observations in this study.
+``` {r counts, out.width = "50%"}
+read_parquet(here::here("data", "discipline_summary_stats.parquet")) %>%
+               knitr::kable(caption = "Table 1 - Observation Counts") %>%
+  kable_styling(full_width = F)
+```
+
+
+## Detailed Results
+
+### Average Discipline Effect
+
+We used a regression to estimate the average impact of discipline on early departures and adherence seconds. 
+
+
+$$ y_o = \beta_0 + \beta_1(D) + \beta_2(T) + \mu_o $$
+
+Each outcome by operator $y_0$ - early departure rate and adherence seconds - is a function of relative day (D) and treatment period (T). The estimated coefficient $\hat{\beta_2}$ shows the average treatment effect of discipline on the outcome. The table below reports this estimate.
+
+
+``` {r table1, include=T,  results = "asis", align = "center"}
+
+stargazer(discipline_model1.1, discipline_model1.2
+          , title = "Table 2 - Regression Results"
+          , type = 'html'
+          , keep = c("Period1Post-discipline")
+          , covariate.labels=c("Discipline Effect                     ")
+          , dep.var.labels=c("Early", "Adherence Seconds")
+          , ci=F, ci.level=0.90, single.row=T, model.numbers=FALSE
+          , column.sep.width = "25pt"
+          , omit.stat = c("rsq","ser", "f"))
+```
+
+### Idiosyncratic Discipline Effect
+
+We want to estimate individual responses to discipline by modifying the equation above to include dummies and interaction terms for each Operator (O).  
+
+$$ y_o = \beta_0 + \sigma(O) + \gamma(D)(O) + \delta(T)(O) +  \omega(T)(O)(D) \mu_o $$
+Outcomes for operators $y_o$- adherence seconds and early departures -  are a function of operator (O),  day (D), and treatment period (T). The elements of $\hat{\delta}$ indicate the degree to which text messages immediately impact a driver's behavior, and the elements of $\hat{\omega}$ show the improvement over time after receiving the text for each driver. The elements of $\hat{\omega}$ are graphed below with 95% confidence intervals.
+
+Graph 5 below plots the elements of $\hat{\delta}$. Graph 5.1 shows that about a third of operators reduced their average early departure rate after receiving discipline. Another third made no significant change in their behavior. Finally, a third actually increased their early departure rates after receiving discipline, though almost all of these estimates are not statistically different from zero.Graph 5.2 and shows that about half of disciplined increased their average daily adherence seconds. 
+
+
+```{r graph5}
+g1.1 <- g.reg.1.1(coeffs2.1, label = "5.1 - Change in early departure rate")
+g1.2 <- g.reg.1.1(coeffs2.2, label = "5.2 - Change in mean adherence seconds")
+
+plot <- ggarrange(g1.1, g1.2, ncol=1, nrow = 2) 
+annotate_figure(plot, top = text_grob("Graph 5 - Individual text effects by run", 
+               color = "black", face = "bold", size = 14))
+
+```
+
+#### Compliers 
+
+Below are three examples of operators who reduced their early departure rates after receiving discipline. 
+
+
+``` {r compliers, out.hight = "1500pt"}
+g1 <- subset(discipline_data,
+        OperatorIdHash == coeffs2.1$OperatorIdHash[1]) %>%
+  g1.1reg()
+g2 <- subset(discipline_data,
+        OperatorIdHash == coeffs2.1$OperatorIdHash[4]) %>%
+  g1.1reg()
+g3 <- subset(discipline_data,
+        OperatorIdHash == coeffs2.1$OperatorIdHash[5]) %>%
+  g1.1reg()
+
+plot <- ggarrange(g1, g2, g3, ncol=1, nrow = 3) 
+annotate_figure(plot, top = text_grob("Graph 7 - Compliers", 
+               color = "black", face = "bold", size = 14))
+```
+
+#### Non-Compliers 
+
+Below are three examples of operators who did not reduce their early departure rates after receiving discipline. 
+
+``` {r noncompliers, out.hight = "1500pt"}
+g1 <- subset(discipline_data,
+        OperatorIdHash == coeffs2.1$OperatorIdHash[184]) %>%
+  g1.1reg()
+g2 <- subset(discipline_data,
+        OperatorIdHash == coeffs2.1$OperatorIdHash[165]) %>%
+  g1.1reg()
+g3 <- subset(discipline_data,
+        OperatorIdHash == coeffs2.1$OperatorIdHash[189]) %>%
+  g1.1reg()
+
+plot <- ggarrange(g1, g2, g3, ncol=1, nrow = 3) 
+annotate_figure(plot, top = text_grob("Graph 8 - Non-Compliers", 
+               color = "black", face = "bold", size = 14))
+```
+
+### Contributors
+
+This analysis was conducted by Anqi Li (OPM), Ana Daley (OPM), and Rob Ross (OPM). Work is stored on [GitHub](https://github.com/MTA-MD-OPM/ds_early_bus_departure_intervention_study/tree/main).
