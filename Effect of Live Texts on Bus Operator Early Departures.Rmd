@@ -276,4 +276,4 @@ Visually inspecting individual runs, I found some where the operator received a 
 
 ## Attribution
 
-This analysis was conducted by Anqi Li (OPM), Ana Daley (OPM), and Rob Ross . Work is stored on [GitHub](https://github.com/MTA-MD-OPM/ds_early_bus_departure_intervention_study/tree/main).
+This analysis was conducted by Anqi Li (OPM), Ana Daley (OPM), and Rob Ross . Work is stored on [GitHub](https://github.com/MTA-MD-OPM/mta_trb_data_challenge_2025_submission/tree/main).
