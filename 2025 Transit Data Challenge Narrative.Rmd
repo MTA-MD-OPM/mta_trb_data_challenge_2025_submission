@@ -27,7 +27,17 @@ I was the primary developer on this project, writing nearly all of the code and 
 
 The methodology of each analysis is documented in the code and the [final report](https://github.com/MTA-MD-OPM/mta_trb_data_challenge_2025_submission/blob/main/Effect-of-Live-Texts-on-Bus-Operator-Early-Departures.html). To read this report, click the download button on the top right of the code file, and open the downloaded .html file in any web browser.
 
-I want to highlight important elements of the "meta" methodology employed to produce this analysis. First, this repository allows a far higher degree of transparency into the data and process used to build these analyses. Any data scientist at the MTA with access to our databases can reproduce the results in this analysis. Data scientists outside the MTA can read my source code to understand how I conducted the analysis. Second, the analysis was built in iterations (a core MTA value) by a team of data scientists working in a scrum framework. Finally, all work is done in R, a free, open-source programming language accessible to all transit agencies. This repository is covered by a GNU GENERAL PUBLIC LICENSE, and data scientists at other agencies are encouraged to use any elements they find useful.
+I want to highlight the elements of this analysis that are innovative in the transit data space. This analysis was produced using git version control, which allows a higher degree of transparency into the data and process used to build these analyses. Any data scientist at the MTA with access to our databases can reproduce the results in this analysis. Data scientists outside the MTA can read my source code to understand how I conducted the analysis. Leveraging git allows data teams to coordinate their efforts asynchronously and remotely, producing better insights faster.
+
+Second, the analysis was built in iterations (a core MTA value) by a team of data scientists working in a scrum framework. Below you can see a screenshot of the individual work items tracked over five iterations which ultimately produced this analysis. Working in small increments helps teams answer stakeholders' most important questions early while gathering regular feedback on progress. 
+
+```{r, out.width='100%', fig.pos='center', fig.cap='Kanban Board', fig.title ='An Alt text'}    
+ 
+knitr::include_graphics("docs/Screenshot 2024-08-18 150447.png")
+
+```
+
+Finally, all work is done in R, a free, open-source programming language accessible to all transit agencies. This repository is covered by a GNU GENERAL PUBLIC LICENSE, and data scientists at other agencies are encouraged to use any elements they find useful.
 
 ### Outcomes
 
@@ -37,4 +47,6 @@ My analysis clearly and convincingly answered a pressing operational question, a
 
 Any agency that already has some digital data management system (SQL server, excel files, Access database, etc.) can replicate this methodology. R and RStudio are free data science tools, and GitHub allows users to create organisations and repositories for free. 
 
-### Visuals can be found in the [final report](https://github.com/MTA-MD-OPM/mta_trb_data_challenge_2025_submission/blob/main/Effect-of-Live-Texts-on-Bus-Operator-Early-Departures.html). To read this report, click the download button on the top right of the code file, and open the downloaded .html file in any web browser.
+### Visuals 
+
+Visuals can be found in the [final report](https://github.com/MTA-MD-OPM/mta_trb_data_challenge_2025_submission/blob/main/Effect-of-Live-Texts-on-Bus-Operator-Early-Departures.html). To read this report, click the download button on the top right of the code file, and open the downloaded .html file in any web browser.
